@@ -37,17 +37,15 @@ function navigateTo(page) {
   const navItem = document.querySelector(`[data-page="${page}"]`);
   if (navItem) navItem.classList.add('active');
 
-  const titles = { dashboard: '工作台', products: '商品管理', github: 'GitHub采集', publish: '发布上架', orders: '订单管理', logs: '操作日志' };
+  const titles = { dashboard: '工作台', products: '商品管理', publish: '发布上架', orders: '订单管理' };
   document.getElementById('pageTitle').textContent = titles[page] || page;
 
   const container = document.getElementById('pageContent');
   switch (page) {
     case 'dashboard': renderDashboard(container); break;
     case 'products': renderProducts(container); break;
-    case 'github': renderGithub(container); break;
     case 'publish': renderPublish(container); break;
     case 'orders': renderOrders(container); break;
-    case 'logs': renderLogs(container); break;
   }
 }
 
@@ -81,10 +79,6 @@ async function renderDashboard(container) {
     </div>
 
     <div class="quick-actions">
-      <div class="action-card" onclick="navigateTo('github')">
-        <div class="ac-icon" style="background:#e3f2fd;color:#1565c0;">G</div>
-        <div><div class="ac-label">GitHub采集</div><div class="ac-desc">搜索学习资料并打包成商品</div></div>
-      </div>
       <div class="action-card" onclick="openProductModal()">
         <div class="ac-icon" style="background:#fff5f0;color:#ff5000;">+</div>
         <div><div class="ac-label">添加商品</div><div class="ac-desc">手动创建新商品</div></div>
@@ -99,16 +93,10 @@ async function renderDashboard(container) {
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-      <div class="panel">
+    <div class="panel">
         <div class="panel-header"><h2>最近订单</h2></div>
         <div class="panel-body" id="dashOrders">加载中...</div>
       </div>
-      <div class="panel">
-        <div class="panel-header"><h2>最近日志</h2></div>
-        <div class="panel-body" id="dashLogs">加载中...</div>
-      </div>
-    </div>
   `;
 
   // 加载最近订单
@@ -124,20 +112,6 @@ async function renderDashboard(container) {
       </div>`).join('');
   } else {
     oDiv.innerHTML = '<div class="empty"><p>暂无订单</p></div>';
-  }
-
-  // 加载最近日志
-  const logsRes = await call('/logs?limit=8');
-  const lDiv = document.getElementById('dashLogs');
-  if (logsRes.success && logsRes.data.length > 0) {
-    lDiv.innerHTML = logsRes.data.slice(0, 5).map(l => `
-      <div style="display:flex;gap:8px;font-size:12px;padding:7px 0;border-bottom:1px solid #f9fafb;">
-        <span style="color:var(--text-secondary);">${fmt(l.created_at)}</span>
-        <span class="log-${l.level}" style="font-weight:600;">[${l.level.toUpperCase()}]</span>
-        <span>${esc(l.action)} ${esc(l.detail)}</span>
-      </div>`).join('');
-  } else {
-    lDiv.innerHTML = '<div class="empty"><p>暂无日志</p></div>';
   }
 
   updateSidebarStats();
@@ -185,161 +159,6 @@ async function renderProducts(container) {
   `;
 
   updateSidebarStats();
-}
-
-// ============ GITHUB ============
-function renderGithub(container) {
-  container.innerHTML = `
-    <div class="search-area">
-      <div class="search-row">
-        <div class="form-group">
-          <label class="form-label">搜索关键词</label>
-          <input class="form-input" id="ghQuery" value="学习资料" placeholder="考研资料、编程教程、英语学习...">
-        </div>
-        <div class="form-group" style="max-width:140px;">
-          <label class="form-label">排序</label>
-          <select class="form-select" id="ghSort"><option value="stars">最多星标</option><option value="updated">最近更新</option><option value="forks">最多Fork</option></select>
-        </div>
-        <div class="form-group" style="max-width:100px;">
-          <label class="form-label">数量</label>
-          <input class="form-input" type="number" id="ghMax" value="10" min="1" max="30">
-        </div>
-        <div class="form-group" style="max-width:110px;">
-          <label class="form-label">售价</label>
-          <input class="form-input" type="number" id="ghPrice" value="9.90" step="0.01" min="0.01">
-        </div>
-        <button class="btn btn-primary btn-lg" onclick="doGithubSearch()">搜索</button>
-        <button class="btn btn-info" onclick="doGithubBulkSearch()">批量采集</button>
-      </div>
-      <div style="margin-top:12px;font-size:12px;color:var(--text-secondary);">
-        热门搜索：考研资料&nbsp;&nbsp;编程教程&nbsp;&nbsp;英语学习&nbsp;&nbsp;面试题&nbsp;&nbsp;电子书合集&nbsp;&nbsp;公考资料&nbsp;&nbsp;CPA&nbsp;&nbsp;雅思&nbsp;&nbsp;期末笔记
-      </div>
-    </div>
-    <div id="ghResults"><div class="empty"><div class="empty-icon">---</div><p>输入关键词开始搜索 GitHub 学习资料</p><p class="empty-hint">搜索到的仓库可以一键打包成商品</p></div></div>
-  `;
-
-  // 回车搜索
-  document.getElementById('ghQuery')?.addEventListener('keydown', e => { if (e.key === 'Enter') doGithubSearch(); });
-}
-
-async function doGithubSearch() {
-  const query = document.getElementById('ghQuery')?.value?.trim();
-  if (!query) return toast('请输入搜索关键词', 'warning');
-
-  const resultsDiv = document.getElementById('ghResults');
-  resultsDiv.innerHTML = '<div class="loading-wrap"><div class="spinner"></div>正在搜索 GitHub...</div>';
-
-  const res = await call('/github/search', {
-    method: 'POST',
-    body: {
-      query,
-      sort: document.getElementById('ghSort')?.value || 'stars',
-      max_results: parseInt(document.getElementById('ghMax')?.value) || 10
-    }
-  });
-
-  if (!res.success || res.data.length === 0) {
-    resultsDiv.innerHTML = `<div class="empty"><div class="empty-icon">---</div><p>${res.success ? '没有找到结果，试试其他关键词' : '搜索失败'}</p></div>`;
-    return;
-  }
-
-  const price = parseFloat(document.getElementById('ghPrice')?.value) || 2.90;
-  window._ghResults = res.data;
-
-  resultsDiv.innerHTML = `
-    <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
-      <span style="font-size:13px;color:var(--text-secondary);">找到 <strong>${res.count}</strong> 个仓库</span>
-      <button class="btn btn-success" onclick="doCreateAllFromGithub(${price})">全部打包成商品 (${price.toFixed(2)}元/个)</button>
-    </div>
-    <div class="repo-list">${res.data.map(r => `
-      <div class="repo-card">
-        <div class="repo-info">
-          <a class="repo-name" href="${esc(r.url)}" target="_blank">${esc(r.name)}</a>
-          <div class="repo-desc">${esc(r.description) || '(无描述)'}</div>
-        </div>
-        <div class="repo-meta">
-          <span class="repo-star">${r.stars.toLocaleString()} stars</span>
-          <span>${esc(r.language) || '-'}</span>
-          <button class="btn btn-primary btn-sm" onclick="doCreateOneFromGithub('${esc(r.name)}','${esc(r.description)}','${esc(r.url)}',${r.stars},'${esc(r.language||'')}',${price})">打包</button>
-        </div>
-      </div>`).join('')}</div>
-  `;
-}
-
-async function doGithubBulkSearch() {
-  const resultsDiv = document.getElementById('ghResults');
-  resultsDiv.innerHTML = '<div class="loading-wrap"><div class="spinner"></div>批量搜索中，约需1-2分钟...</div>';
-
-  const res = await call('/github/bulk-search', { method: 'POST', body: {} });
-  if (!res.success || res.data.length === 0) {
-    resultsDiv.innerHTML = '<div class="empty"><p>批量搜索失败</p></div>';
-    return;
-  }
-
-  const price = parseFloat(document.getElementById('ghPrice')?.value) || 2.90;
-  window._ghResults = res.data;
-
-  resultsDiv.innerHTML = `
-    <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
-      <span style="font-size:13px;color:var(--text-secondary);">批量采集到 <strong>${res.count}</strong> 个仓库</span>
-      <button class="btn btn-success" onclick="doCreateAllFromGithub(${price})">全部打包成商品 (${price.toFixed(2)}元/个)</button>
-    </div>
-    <div class="repo-list">${res.data.map(r => `
-      <div class="repo-card">
-        <div class="repo-info">
-          <a class="repo-name" href="${esc(r.url)}" target="_blank">${esc(r.name)}</a>
-          <div class="repo-desc">${esc(r.description) || '(无描述)'} [来源: ${esc(r.query)}]</div>
-        </div>
-        <div class="repo-meta">
-          <span class="repo-star">${r.stars.toLocaleString()} stars</span>
-          <button class="btn btn-primary btn-sm" onclick="doCreateOneFromGithub('${esc(r.name)}','${esc(r.description)}','${esc(r.url)}',${r.stars},'${esc(r.language||'')}',${price})">打包</button>
-        </div>
-      </div>`).join('')}</div>
-  `;
-}
-
-async function doCreateOneFromGithub(name, desc, url, stars, lang, price) {
-  const defaultContent = `感谢购买！
-
-资料名称：【${name}】学习资料合集
-简介：${desc}
-GitHub星标：${stars}
-GitHub地址：${url}
-
-百度网盘：https://pan.baidu.com/s/xxxxx
-提取码：xxxx
-
-确认收货后凭截图领取额外福利资料一份！
-有任何问题请随时联系~`;
-
-  const delivery = prompt('请输入百度网盘链接和提取码作为发货内容：', defaultContent);
-  if (!delivery) return;
-
-  const res = await call('/github/create-products', {
-    method: 'POST',
-    body: { repos: [{ name, description: desc, url, stars, language: lang }], price }
-  });
-
-  if (res.success && res.data.product_ids[0]) {
-    await call(`/products/${res.data.product_ids[0]}`, { method: 'PUT', body: { delivery_content: delivery } });
-    toast('商品已创建', 'success');
-    updateSidebarStats();
-  } else {
-    toast('创建失败', 'error');
-  }
-}
-
-async function doCreateAllFromGithub(price) {
-  if (!window._ghResults || window._ghResults.length === 0) return toast('没有搜索结果', 'warning');
-  if (!confirm(`确定将 ${window._ghResults.length} 个仓库全部打包成商品？\n\n需要手动为每个商品填入百度网盘链接。`)) return;
-
-  const res = await call('/github/create-products', { method: 'POST', body: { repos: window._ghResults, price } });
-  if (res.success) {
-    toast(`已创建 ${res.data.product_ids.length} 个商品，请逐一点击编辑添加百度网盘链接`, 'success');
-    updateSidebarStats();
-  } else {
-    toast('批量创建失败', 'error');
-  }
 }
 
 // ============ PUBLISH ============
@@ -535,30 +354,6 @@ async function toggleMonitor() {
   navigateTo(currentPage);
 }
 
-// ============ LOGS ============
-async function renderLogs(container) {
-  const res = await call('/logs?limit=200');
-  const logs = res.success ? res.data : [];
-
-  container.innerHTML = `
-    <div class="panel">
-      <div class="panel-header">
-        <h2>操作日志 (${logs.length})</h2>
-        <button class="btn btn-ghost btn-sm" onclick="renderLogs(document.getElementById('pageContent'))">刷新</button>
-      </div>
-      <div class="panel-body flat">
-        <div class="log-list" style="padding:0 24px;">
-          ${logs.length === 0 ? '<div class="empty"><p>暂无日志</p></div>' : logs.map(l => `
-            <div class="log-item">
-              <span class="log-time">${fmt(l.created_at)}</span>
-              <span class="log-action log-${l.level}">[${l.level.toUpperCase()}]</span>
-              <span>${esc(l.action)} ${esc(l.detail)}</span>
-            </div>`).join('')}
-        </div>
-      </div>
-    </div>
-  `;
-}
 
 // ============ PRODUCT MODAL ============
 function openProductModal(id) {
