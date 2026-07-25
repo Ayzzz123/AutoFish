@@ -17,7 +17,7 @@ IM_URL = "https://www.goofish.com/im"
 LOGIN_URL = "https://www.goofish.com"
 
 # 浏览器配置
-BROWSER_HEADLESS = False  # 保持False可以看到浏览器操作，也避免headless被检测
+BROWSER_HEADLESS = True  # 静默后台运行，不会弹出浏览器窗口
 USER_DATA_DIR = os.path.join(BASE_DIR, "data", "browser_profile")  # 浏览器用户数据（保持登录态）
 
 # 监控配置

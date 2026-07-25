@@ -27,6 +27,15 @@ async def get_browser():
     global _browser, _context, _page, _browser_loop
     current_loop = asyncio.get_running_loop()
     if _browser_loop is not None and _browser_loop is not current_loop:
+        # 新事件循环：关闭旧浏览器避免泄露，再重建
+        try:
+            await _context.close() if _context else None
+        except Exception:
+            pass
+        try:
+            await _browser.close() if _browser else None
+        except Exception:
+            pass
         _browser = _context = _page = None
         _browser_loop = None
 
@@ -35,7 +44,12 @@ async def get_browser():
         _browser = await p.chromium.launch(
             headless=BROWSER_HEADLESS,
             channel='msedge',  # 使用系统安装的 Edge
-            args=['--disable-blink-features=AutomationControlled', '--no-sandbox']
+            args=[
+                '--disable-blink-features=AutomationControlled',
+                '--no-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+            ]
         )
         os.makedirs(USER_DATA_DIR, exist_ok=True)
         state_file = os.path.join(USER_DATA_DIR, 'state.json')
