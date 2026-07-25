@@ -483,7 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
   navigateTo('dashboard');
   updateLoginStatus();
   setInterval(updateSidebarStats, 15000);
-  setInterval(updateLoginStatus, 45000);
+  setInterval(updateLoginStatus, 300000);
 });
 
 document.getElementById('productModal').addEventListener('click', function(e) {

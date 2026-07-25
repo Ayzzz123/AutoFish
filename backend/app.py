@@ -48,6 +48,9 @@ _monitor_thread = None
 _monitor_running = False
 _login_state = {'in_progress': False, 'logged_in': False, 'error': ''}
 _login_state_lock = threading.Lock()
+# 登录状态缓存，避免频繁启动浏览器
+_login_status_cache = {'logged_in': False, 'checked_at': 0}
+_login_cache_ttl = 300  # 5分钟缓存
 
 
 # ==================== 主页 ====================
@@ -303,7 +306,17 @@ def api_github_create_products():
 
 @app.route('/api/goofish/status', methods=['GET'])
 def api_goofish_status():
-    """获取闲鱼连接状态"""
+    """获取闲鱼连接状态（5分钟内缓存，避免频繁启动浏览器）"""
+    global _login_status_cache
+    now = time.time()
+    if now - _login_status_cache['checked_at'] < _login_cache_ttl:
+        return jsonify({
+            'success': True,
+            'connected': _login_status_cache['logged_in'],
+            'logged_in': _login_status_cache['logged_in'],
+            'title': 'Goofish (cached)',
+        })
+
     async def inspect_status():
         result = await test_connection()
         logged_in = await check_login_status()
@@ -311,6 +324,7 @@ def api_goofish_status():
         return result, logged_in
 
     result, logged_in = asyncio.run(inspect_status())
+    _login_status_cache = {'logged_in': logged_in, 'checked_at': now}
     return jsonify({
         'success': True,
         'connected': result.get('success', False),
