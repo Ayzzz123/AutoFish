@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>闲鱼自动化管理系统</title>
+<style>
+:root {
+  --primary: #ff5000; --primary-light: #ff7a45; --primary-bg: #fff5f0;
+  --success: #00c853; --success-bg: #e8f5e9;
+  --warning: #ff9800; --warning-bg: #fff8e1;
+  --danger: #f44336; --danger-bg: #ffebee;
+  --info: #2196f3; --info-bg: #e3f2fd;
+  --bg: #f0f2f5; --card: #ffffff;
+  --sidebar-bg: #1a1a2e; --sidebar-hover: #252542; --sidebar-active: #ff5000;
+  --text: #1a1a2e; --text-secondary: #6b7280; --border: #e5e7eb;
+  --radius: 12px; --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-lg: 0 10px 40px rgba(0,0,0,.08);
+  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; display: flex; }
+
+/* sidebar */
+.sidebar { width: 240px; min-width: 240px; background: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; overflow-y: auto; }
+.sidebar-brand { padding: 28px 24px 24px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.sidebar-brand .brand-icon { width: 36px; height: 36px; background: var(--primary); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; }
+.sidebar-brand .brand-text h2 { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+.sidebar-brand .brand-text span { font-size: 11px; color: rgba(255,255,255,.4); }
+.sidebar-nav { flex: 1; padding: 8px 0; }
+.sidebar-section { padding: 18px 24px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255,255,255,.3); font-weight: 700; }
+.sidebar-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; margin: 2px 10px; border-radius: var(--radius-sm); cursor: pointer; font-size: 14px; color: rgba(255,255,255,.6); transition: var(--transition); border: none; background: none; width: calc(100% - 20px); text-align: left; }
+.sidebar-item:hover { background: var(--sidebar-hover); color: #fff; }
+.sidebar-item.active { background: var(--sidebar-active); color: #fff; font-weight: 600; box-shadow: 0 4px 12px rgba(255,80,0,.35); }
+.sidebar-item svg { width: 18px; height: 18px; opacity: 0.7; flex-shrink: 0; }
+.sidebar-item.active svg { opacity: 1; }
+.sidebar-item .badge { margin-left: auto; background: var(--danger); color: #fff; font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: 600; min-width: 20px; text-align: center; }
+.sidebar-item .badge.warn { background: var(--warning); }
+.sidebar-footer { padding: 14px 16px; border-top: 1px solid rgba(255,255,255,.08); display: flex; flex-direction: column; gap: 6px; }
+.sidebar-status { display: flex; align-items: center; gap: 8px; font-size: 11px; color: rgba(255,255,255,.45); padding: 6px 10px; border-radius: 6px; }
+.sidebar-status .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.sidebar-status .dot.on { background: #4caf50; box-shadow: 0 0 6px rgba(76,175,80,.5); }
+.sidebar-status .dot.off { background: #f44336; }
+
+/* main */
+.main { margin-left: 240px; flex: 1; min-height: 100vh; }
+.topbar { background: var(--card); padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
+.topbar h1 { font-size: 18px; font-weight: 600; }
+.topbar-actions { display: flex; gap: 10px; align-items: center; }
+.content { padding: 28px 32px; }
+
+/* stats */
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+.stat-card { background: var(--card); border-radius: var(--radius); padding: 22px 24px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 16px; transition: var(--transition); border: 1px solid transparent; }
+.stat-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-1px); }
+.stat-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; flex-shrink: 0; }
+.stat-icon.products { background: var(--primary-bg); color: var(--primary); }
+.stat-icon.orders { background: var(--info-bg); color: var(--info); }
+.stat-icon.pending { background: var(--warning-bg); color: var(--warning); }
+.stat-icon.delivered { background: var(--success-bg); color: var(--success); }
+.stat-value { font-size: 28px; font-weight: 700; line-height: 1.2; }
+.stat-label { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+/* panel */
+.panel { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); }
+.panel-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid var(--border); }
+.panel-header h2 { font-size: 16px; font-weight: 600; }
+.panel-body { padding: 24px; }
+.panel-body.flat { padding: 0; }
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: var(--radius-sm); border: 1px solid transparent; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; transition: var(--transition); white-space: nowrap; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: #e04600; box-shadow: 0 4px 12px rgba(255,80,0,.3); }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { background: #00a844; box-shadow: 0 4px 12px rgba(0,200,83,.3); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { background: #d32f2f; }
+.btn-info { background: var(--info); color: #fff; }
+.btn-info:hover { background: #1976d2; }
+.btn-ghost { background: transparent; color: var(--text); border-color: var(--border); }
+.btn-ghost:hover { background: #f5f5f5; }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.btn-lg { padding: 12px 28px; font-size: 15px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
+/* table */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th { text-align: left; padding: 12px 16px; background: #fafafa; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+tbody td { padding: 13px 16px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+tbody tr { transition: var(--transition); }
+tbody tr:hover td { background: #fafbfc; }
+.cell-title { font-weight: 600; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.cell-price { font-weight: 700; color: var(--primary); }
+.cell-actions { display: flex; gap: 6px; }
+
+/* tags */
+.tag { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.2px; }
+.tag-draft { background: #f3f4f6; color: #6b7280; }
+.tag-listed { background: #e8f5e9; color: #2e7d32; }
+.tag-paid, .tag-shipped { background: var(--primary-bg); color: var(--primary); }
+.tag-completed { background: #e8f5e9; color: #2e7d32; }
+.tag-closed { background: #ffebee; color: #c62828; }
+
+/* forms */
+.form-group { margin-bottom: 18px; }
+.form-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+.form-label .req { color: var(--danger); }
+.form-input, .form-textarea, .form-select { width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; font-family: inherit; transition: var(--transition); background: #fafbfc; color: var(--text); }
+.form-input:focus, .form-textarea:focus, .form-select:focus { outline: none; border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px rgba(255,80,0,.08); }
+.form-textarea { resize: vertical; min-height: 90px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-hint { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+
+/* modal */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); backdrop-filter: blur(4px); z-index: 1000; justify-content: center; align-items: center; }
+.modal-overlay.show { display: flex; }
+.modal { background: var(--card); border-radius: var(--radius); width: 90%; max-width: 720px; max-height: 85vh; overflow-y: auto; box-shadow: 0 25px 80px rgba(0,0,0,.2); }
+.modal-header { padding: 20px 28px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--card); z-index: 1; }
+.modal-header h3 { font-size: 17px; }
+.modal-close { width: 32px; height: 32px; border-radius: 50%; border: none; background: #f3f4f6; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: var(--transition); }
+.modal-close:hover { background: #e5e7eb; }
+.modal-body { padding: 28px; }
+.modal-footer { padding: 16px 28px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; background: var(--card); position: sticky; bottom: 0; }
+
+/* toast */
+.toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+.toast { padding: 14px 20px; border-radius: var(--radius-sm); color: #fff; font-size: 14px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,.15); animation: slideIn .3s ease; display: flex; align-items: center; gap: 10px; max-width: 420px; }
+.toast-success { background: #1b5e20; }
+.toast-error { background: #b71c1c; }
+.toast-info { background: #0d47a1; }
+.toast-warning { background: #e65100; }
+
+/* empty */
+.empty { text-align: center; padding: 56px 24px; color: var(--text-secondary); }
+.empty .empty-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.5; font-weight: 300; }
+.empty p { margin-bottom: 4px; font-size: 14px; }
+.empty .empty-hint { font-size: 12px; color: #b0b7c3; }
+
+/* search area */
+.search-area { background: linear-gradient(135deg, #f8f9ff, #f0f4ff); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; border: 1px dashed #d0d7ff; }
+.search-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.search-row .form-group { margin-bottom: 0; flex: 1; min-width: 150px; }
+.repo-list { max-height: 500px; overflow-y: auto; }
+.repo-card { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 8px; transition: var(--transition); background: #fafbfc; }
+.repo-card:hover { border-color: var(--primary); background: #fff; box-shadow: var(--shadow); }
+.repo-info { flex: 1; min-width: 0; }
+.repo-name { font-weight: 600; font-size: 14px; color: var(--info); cursor: pointer; }
+.repo-name:hover { text-decoration: underline; }
+.repo-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.repo-meta { display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); flex-shrink: 0; align-items: center; }
+.repo-star { color: var(--warning); font-weight: 600; }
+
+/* logs */
+.log-list { font-size: 13px; font-family: "SF Mono", "Fira Code", "Consolas", monospace; max-height: 500px; overflow-y: auto; }
+.log-item { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid #f9fafb; align-items: baseline; }
+.log-time { color: var(--text-secondary); font-size: 11px; white-space: nowrap; min-width: 150px; }
+.log-action { font-weight: 600; min-width: 90px; }
+.log-success { color: var(--success); }
+.log-error { color: var(--danger); }
+.log-warning { color: var(--warning); }
+.log-info { color: var(--info); }
+
+/* quick actions */
+.quick-actions { display: flex; gap: 12px; margin-bottom: 28px; flex-wrap: wrap; }
+.action-card { flex: 1; min-width: 180px; padding: 20px 22px; border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); cursor: pointer; transition: var(--transition); border: 1.5px solid transparent; display: flex; align-items: center; gap: 14px; }
+.action-card:hover { border-color: var(--primary); box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+.action-card .ac-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; flex-shrink: 0; }
+.action-card .ac-label { font-weight: 600; font-size: 14px; }
+.action-card .ac-desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+/* alerts */
+.alert { padding: 14px 18px; border-radius: var(--radius-sm); margin-bottom: 18px; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+.alert-warning { background: var(--warning-bg); color: #e65100; border: 1px solid #ffe0b2; }
+.alert-success { background: var(--success-bg); color: #1b5e20; border: 1px solid #c8e6c9; }
+.alert-info { background: var(--info-bg); color: #0d47a1; border: 1px solid #bbdefb; }
+
+/* delivery states */
+.delivery-pending, .delivery-sending { color: #e65100; font-weight: 600; }
+.delivery-sent { color: #1b5e20; font-weight: 600; }
+.delivery-failed, .delivery-review { color: #c62828; font-weight: 600; }
+.delivery-error-box { margin-top: 8px; padding: 10px 14px; border-radius: 6px; background: #ffebee; color: #c62828; font-size: 12px; line-height: 1.6; word-break: break-word; }
+.order-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; }
+.order-detail-grid dt { color: var(--text-secondary); font-size: 11px; }
+.order-detail-grid dd { margin: 0 0 8px 0; font-weight: 500; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideIn { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { width: 20px; height: 20px; border: 2.5px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; }
+.loading-wrap { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 32px; color: var(--text-secondary); }
+
+/* responsive */
+@media (max-width: 1024px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .sidebar { width: 64px; min-width: 64px; }
+  .sidebar-brand { justify-content: center; padding: 16px 8px; }
+  .sidebar-brand .brand-text, .sidebar-section, .sidebar-item span:not(.badge), .sidebar-status span, .sidebar-item .badge { display: none; }
+  .sidebar-item { justify-content: center; padding: 12px; width: 44px; margin: 2px auto; }
+  .main { margin-left: 64px; }
+  .form-row { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .stats-grid { grid-template-columns: 1fr; }
+  .search-row { flex-direction: column; }
+  .sidebar { display: none; }
+  .main { margin-left: 0; }
+  .topbar { flex-wrap: wrap; gap: 8px; }
+  .topbar-actions { width: 100%; }
+  .content { padding: 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">闲</div>
+    <div class="brand-text">
+      <h2>闲鱼助手</h2>
+      <span>Auto Seller v1.0</span>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">主菜单</div>
+    <button class="sidebar-item active" data-page="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      工作台
+    </button>
+    <button class="sidebar-item" data-page="products">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+      商品管理
+      <span class="badge" id="navProductCount">0</span>
+    </button>
+    <button class="sidebar-item" data-page="github">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      GitHub采集
+    </button>
+    <button class="sidebar-item" data-page="publish">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+      发布上架
+    </button>
+    <div class="sidebar-section">交易</div>
+    <button class="sidebar-item" data-page="orders">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      订单管理
+      <span class="badge warn" id="navPendingCount">0</span>
+    </button>
+    <button class="sidebar-item" data-page="logs">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      操作日志
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="sidebar-status"><span class="dot off" id="statusDot"></span><span id="statusText">监控未启动</span></div>
+    <div class="sidebar-status"><span class="dot off" id="loginDot"></span><span id="loginText">未登录闲鱼</span></div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="topbar">
+    <h1 id="pageTitle">工作台</h1>
+    <div class="topbar-actions">
+      <button class="btn btn-success btn-sm" id="btnMonitorStart" onclick="toggleMonitor()">启动监控</button>
+      <button class="btn btn-primary btn-sm" onclick="navigateTo('github')">GitHub采集</button>
+    </div>
+  </div>
+  <div class="content" id="pageContent"></div>
+</main>
+
+<!-- PRODUCT MODAL -->
+<div class="modal-overlay" id="productModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="productModalTitle">添加商品</h3>
+      <button class="modal-close" onclick="closeProductModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editProductId">
+      <div class="form-group">
+        <label class="form-label">商品标题 <span class="req">*</span></label>
+        <input class="form-input" id="editTitle" placeholder="例如：2025考研数学全套资料 张宇汤家凤李永乐合集">
+      </div>
+      <div class="form-group">
+        <label class="form-label">商品描述</label>
+        <textarea class="form-textarea" id="editDescription" rows="3" placeholder="详细描述资料内容、来源、包含文件等，让买家了解商品价值..."></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">售价 <span class="req">*</span></label>
+          <input class="form-input" type="number" id="editPrice" value="2.90" step="0.01" min="0.01">
+        </div>
+        <div class="form-group">
+          <label class="form-label">原价</label>
+          <input class="form-input" type="number" id="editOriginalPrice" value="29.00" step="0.01">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">百度网盘发货内容 <span class="req">*</span></label>
+        <textarea class="form-textarea" id="editDeliveryContent" rows="5" placeholder="感谢购买！
+
+资料名称：【XXX学习资料合集】
+内容：视频教程 + PDF讲义 + 习题答案
+
+百度网盘：https://pan.baidu.com/s/xxxxx
+提取码：abcd
+
+确认收货后凭截图可领取额外福利资料一份！
+有任何问题请随时联系~"></textarea>
+        <div class="form-hint">买家付款后，此内容将自动通过闲鱼聊天发送给买家</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">分类</label>
+        <input class="form-input" id="editCategory" placeholder="如：考研资料、编程教程、英语学习">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeProductModal()">取消</button>
+      <button class="btn btn-primary btn-lg" onclick="saveProduct()">保存商品</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
